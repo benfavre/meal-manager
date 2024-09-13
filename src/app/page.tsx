@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { CalendarIcon, List, Settings, Plus, X, Trash2, Edit, ChevronDown, ChevronUp, Eye, EyeOff, ArrowUp, ArrowDown, Image as ImageIcon, Search, Copy, ShoppingCart, FileText, Printer, Clock, Grid, Truck, CreditCard, User, Building } from "lucide-react"
+import { CalendarIcon, List, Settings, Plus, X, Trash2, Edit, ChevronDown, ChevronUp, Eye, EyeOff, ArrowUp, ArrowDown, Image as ImageIcon, Search, Copy, ShoppingCart, FileText, Printer, Clock, Grid, Truck, CreditCard, User, Building, Users } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
@@ -164,7 +164,8 @@ interface User {
   id: string
   name: string
   email: string
-  role: 'Admin' | 'Shop manager' | 'Client'
+  role: 'Admin' | 'Shop manager' | 'Client' | 'Super Admin'
+  tenantId?: string
 }
 
 interface Tenant {
@@ -244,6 +245,9 @@ interface AdminState {
   updatePaymentMethod: (id: string, paymentMethod: Partial<PaymentMethod>) => void
   deletePaymentMethod: (id: string) => void
   setCurrentUser: (user: User | null) => void
+  addUser: (user: User) => void
+  updateUser: (id: string, user: Partial<User>) => void
+  deleteUser: (id: string) => void
   addTenant: (tenant: Tenant) => void
   updateTenant: (id: string, tenant: Partial<Tenant>) => void
   deleteTenant: (id: string) => void
@@ -281,6 +285,7 @@ const useAdminStore = create<AdminState>()(
         { id: '1', name: 'Admin User', email: 'admin@example.com', role: 'Admin' },
         { id: '2', name: 'Shop Manager', email: 'manager@example.com', role: 'Shop manager' },
         { id: '3', name: 'Client User', email: 'client@example.com', role: 'Client' },
+        { id: '4', name: 'Super Admin', email: 'superadmin@example.com', role: 'Super Admin' },
       ],
       currentUser: null,
       tenants: [
@@ -559,6 +564,13 @@ const useAdminStore = create<AdminState>()(
         }
       })),
       setCurrentUser: (user) => set({ currentUser: user }),
+      addUser: (user) => set((state) => ({ users: [...state.users, user] })),
+      updateUser: (id, updatedUser) => set((state) => ({
+        users: state.users.map(user => user.id === id ? { ...user, ...updatedUser } : user)
+      })),
+      deleteUser: (id) => set((state) => ({
+        users: state.users.filter(user => user.id !== id)
+      })),
       addTenant: (tenant) => set((state) => ({ tenants: [...state.tenants, tenant] })),
       updateTenant: (id, updatedTenant) => set((state) => ({
         tenants: state.tenants.map(tenant =>
@@ -799,7 +811,7 @@ function TenantsAdministration() {
   return (
     <div className="space-y-4">
       <h2 className="text-3xl font-bold text-gray-800">Tenants Administration</h2>
-      <div className="flex space-x-4">
+      <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
         <div className="flex-1">
           <Input
             placeholder="Search by tenant name..."
@@ -807,7 +819,7 @@ function TenantsAdministration() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="w-48">
+        <div className="w-full md:w-48">
           <Select value={statusFilter} onValueChange={(value: Tenant['status'] | 'all') => setStatusFilter(value)}>
             <SelectTrigger>
               <SelectValue placeholder="Filter by status" />
@@ -890,7 +902,7 @@ function AdminBar() {
   const [isSignInOpen, setIsSignInOpen] = useState(false)
   const [isRegisterOpen, setIsRegisterOpen] = useState(false)
 
-  const handleRoleChange = (role: 'Admin' | 'Shop manager' | 'Client') => {
+  const handleRoleChange = (role: 'Admin' | 'Shop manager' | 'Client' | 'Super Admin') => {
     const user = users.find(u => u.role === role)
     if (user) {
       setCurrentUser(user)
@@ -912,8 +924,8 @@ function AdminBar() {
   }
 
   return (
-    <div className="bg-gray-800 text-white p-4 flex justify-between items-center">
-      <div className="flex space-x-4">
+    <div className="bg-gray-800 text-white p-4 flex flex-col md:flex-row justify-between items-center">
+      <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 mb-4 md:mb-0">
         <Select onValueChange={handleRoleChange} value={currentUser?.role || ''}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Select role" />
@@ -922,6 +934,7 @@ function AdminBar() {
             <SelectItem value="Admin">Admin</SelectItem>
             <SelectItem value="Shop manager">Shop manager</SelectItem>
             <SelectItem value="Client">Client</SelectItem>
+            <SelectItem value="Super Admin">Super Admin</SelectItem>
           </SelectContent>
         </Select>
         <Select onValueChange={handleUserChange} value={currentUser?.id || ''}>
@@ -1021,7 +1034,7 @@ function SignInDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (op
 }
 
 function RegisterDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
-  const { users, setCurrentUser } = useAdminStore()
+  const { users, setCurrentUser, addUser } = useAdminStore()
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("test")
@@ -1034,6 +1047,7 @@ function RegisterDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (
       email,
       role: 'Client'
     }
+    addUser(newUser)
     setCurrentUser(newUser)
     onOpenChange(false)
     toast.success('Registered successfully')
@@ -1101,6 +1115,7 @@ export default function AdminDashboard() {
       { label: "Shipping Methods", icon: Truck, tab: "shipping-methods" },
       { label: "Payment Methods", icon: CreditCard, tab: "payment-methods" },
       { label: "Settings", icon: Settings, tab: "settings" },
+      { label: "Clients", icon: Users, tab: "clients" },
     ]
 
     const shopManagerItems = [
@@ -1114,6 +1129,7 @@ export default function AdminDashboard() {
     const superAdminItems = [
       { label: "Tenant Registrations", icon: Building, tab: "tenant-registrations" },
       { label: "Tenants Administration", icon: Building, tab: "tenants-administration" },
+      { label: "Users Administration", icon: Users, tab: "users-administration" },
     ]
 
     let items = commonItems
@@ -1143,7 +1159,7 @@ export default function AdminDashboard() {
       <AdminBar />
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <aside className="w-64 bg-white shadow-md">
+        <aside className="w-64 bg-white shadow-md hidden md:block">
           <div className="p-4">
             <h1 className="text-2xl font-bold text-gray-800">Admin Dashboard</h1>
           </div>
@@ -1162,6 +1178,25 @@ export default function AdminDashboard() {
           </nav>
         </aside>
 
+        {/* Mobile menu */}
+        <div className="md:hidden">
+          <Select onValueChange={(value) => setActiveTab(value)}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select menu item" />
+            </SelectTrigger>
+            <SelectContent>
+              {menuItems.map((item) => (
+                <SelectItem key={item.tab} value={item.tab}>
+                  <div className="flex items-center">
+                    <item.icon className="w-5 h-5 mr-2" />
+                    {item.label}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* Main content */}
         <main className="flex-1 p-8 overflow-y-auto">
           <div className="max-w-6xl mx-auto">
@@ -1177,7 +1212,9 @@ export default function AdminDashboard() {
             {activeTab === "settings" && <ShopSettings />}
             {activeTab === "tenant-registrations" && isSuperAdminMode && <TenantRegistrations />}
             {activeTab === "tenants-administration" && isSuperAdminMode && <TenantsAdministration />}
+            {activeTab === "users-administration" && isSuperAdminMode && <UsersAdministration />}
             {activeTab === "tenant-signup" && <TenantSignup />}
+            {activeTab === "clients" && <ClientsDashboard />}
           </div>
         </main>
         <Toaster />
@@ -1309,7 +1346,7 @@ function MealPlanner() {
           <CardTitle>Scheduled Meal Offerings</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="mb-4 flex space-x-4">
+          <div className="mb-4 flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
             <div className="flex-1">
               <Label htmlFor="search-meals">Search Meals</Label>
               <Input
@@ -1361,8 +1398,8 @@ function MealPlanner() {
               <ul className="space-y-8">
                 {filteredMealOfferings.map((offering) => (
                   <li key={offering.id} className="bg-gray-100 rounded p-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <div className="flex items-center space-x-2">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-2">
+                      <div className="flex flex-col md:flex-row md:items-center space-y-2 md:space-y-0 md:space-x-2">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -1391,7 +1428,7 @@ function MealPlanner() {
                           {shopSettings.locations.find(l => l.id === offering.locationId)?.name || 'Unknown Location'}
                         </Badge>
                       </div>
-                      <div className="space-x-2">
+                      <div className="space-x-2 mt-2 md:mt-0">
                         <Button
                           variant="outline"
                           size="sm"
@@ -2231,7 +2268,7 @@ function MediaLibraryPopup({ onClose, onSelect }: { onClose: () => void; onSelec
 }
 
 function MealOrdering() {
-  const { mealOfferings, addToCart, cart, removeFromCart, updateCartItemQuantity, shopSettings } = useAdminStore()
+  const { mealOfferings, addToCart, cart, removeFromCart, updateCartItemQuantity, shopSettings, currentUser, addUser, setCurrentUser } = useAdminStore()
   const [selectedOffering, setSelectedOffering] = useState<MealOffering | null>(null)
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
   const [selectedLocationId, setSelectedLocationId] = useState(shopSettings.primaryLocationId)
@@ -2314,7 +2351,7 @@ function MealOrdering() {
 
         {selectedOffering && (
           <div className="space-y-8">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
               <div className="flex items-center space-x-2">
                 <Button
                   variant={viewMode === 'card' ? 'default' : 'outline'}
@@ -2333,7 +2370,7 @@ function MealOrdering() {
                   List View
                 </Button>
               </div>
-              <div className="relative w-64">
+              <div className="relative w-full md:w-64">
                 <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" />
                 <Input
                   type="text"
@@ -2507,13 +2544,33 @@ function MealOrdering() {
           </CardContent>
         </Card>
       </div>
-      {isCheckoutOpen && <OrderCheckout onClose={() => setIsCheckoutOpen(false)} selectedLocationId={selectedLocationId} />}
+      {isCheckoutOpen && (
+        <OrderCheckout
+          onClose={() => setIsCheckoutOpen(false)}
+          selectedLocationId={selectedLocationId}
+          currentUser={currentUser}
+          addUser={addUser}
+          setCurrentUser={setCurrentUser}
+        />
+      )}
     </div>
   )
 }
 
-function OrderCheckout({ onClose, selectedLocationId }: { onClose: () => void; selectedLocationId: string }) {
-  const { cart, addOrder, clearCart, shopSettings, currentUser } = useAdminStore()
+function OrderCheckout({
+  onClose,
+  selectedLocationId,
+  currentUser,
+  addUser,
+  setCurrentUser
+}: {
+  onClose: () => void;
+  selectedLocationId: string;
+  currentUser: User | null;
+  addUser: (user: User) => void;
+  setCurrentUser: (user: User | null) => void;
+}) {
+  const { cart, addOrder, clearCart, shopSettings } = useAdminStore()
   const [customerName, setCustomerName] = useState(currentUser?.name || "")
   const [customerEmail, setCustomerEmail] = useState(currentUser?.email || "")
   const [customerPhone, setCustomerPhone] = useState("")
@@ -2523,6 +2580,8 @@ function OrderCheckout({ onClose, selectedLocationId }: { onClose: () => void; s
   const [confirmedOrder, setConfirmedOrder] = useState<Order | null>(null)
   const [selectedShippingMethod, setSelectedShippingMethod] = useState<string>("")
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("")
+  const [isSignInOpen, setIsSignInOpen] = useState(false)
+  const [isRegisterOpen, setIsRegisterOpen] = useState(false)
 
   const totalAmount = cart.reduce((total, item) => total + item.price * item.quantity, 0)
   const selectedShipping = shopSettings.shippingMethods.find(method => method.id === selectedShippingMethod)
@@ -2532,6 +2591,10 @@ function OrderCheckout({ onClose, selectedLocationId }: { onClose: () => void; s
     e.preventDefault()
     if (!selectedShippingMethod || !selectedPaymentMethod) {
       toast.error('Please select both shipping and payment methods')
+      return
+    }
+    if (!currentUser) {
+      setIsSignInOpen(true)
       return
     }
     const newOrder: Order = {
@@ -2554,6 +2617,33 @@ function OrderCheckout({ onClose, selectedLocationId }: { onClose: () => void; s
     setOrderConfirmed(true)
     setConfirmedOrder(newOrder)
     setTimeout(() => setShowConfetti(false), 5000)
+  }
+
+  const handleSignIn = (email: string, password: string) => {
+    // Implement your sign-in logic here
+    // For this example, we'll just set the current user
+    const user = {
+      id: Date.now().toString(),
+      name: email.split('@')[0],
+      email,
+      role: 'Client'
+    }
+    setCurrentUser(user)
+    setIsSignInOpen(false)
+  }
+
+  const handleRegister = (name: string, email: string, password: string) => {
+    // Implement your registration logic here
+    // For this example, we'll just add a new user
+    const newUser: User = {
+      id: Date.now().toString(),
+      name,
+      email,
+      role: 'Client'
+    }
+    addUser(newUser)
+    setCurrentUser(newUser)
+    setIsRegisterOpen(false)
   }
 
   if (orderConfirmed && confirmedOrder) {
@@ -2694,6 +2784,24 @@ function OrderCheckout({ onClose, selectedLocationId }: { onClose: () => void; s
         </form>
       </DialogContent>
       {showConfetti && <Confetti />}
+      {isSignInOpen && (
+        <SignInDialog
+          open={isSignInOpen}
+          onOpenChange={setIsSignInOpen}
+          onSignIn={handleSignIn}
+          onRegister={() => {
+            setIsSignInOpen(false)
+            setIsRegisterOpen(true)
+          }}
+        />
+      )}
+      {isRegisterOpen && (
+        <RegisterDialog
+          open={isRegisterOpen}
+          onOpenChange={setIsRegisterOpen}
+          onRegister={handleRegister}
+        />
+      )}
     </Dialog>
   )
 }
@@ -2715,7 +2823,7 @@ function Orders() {
   return (
     <div className="space-y-4">
       <h2 className="text-3xl font-bold text-gray-800">Orders</h2>
-      <div className="flex space-x-4">
+      <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
         <div className="flex-1">
           <Input
             placeholder="Search by customer name or email..."
@@ -2723,7 +2831,7 @@ function Orders() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="w-48">
+        <div className="w-full md:w-48">
           <Select value={statusFilter} onValueChange={(value: Order['status'] | 'all') => setStatusFilter(value)}>
             <SelectTrigger>
               <SelectValue placeholder="Filter by status" />
@@ -2737,7 +2845,7 @@ function Orders() {
             </SelectContent>
           </Select>
         </div>
-        <div className="w-48">
+        <div className="w-full md:w-48">
           <Select value={locationFilter} onValueChange={setLocationFilter}>
             <SelectTrigger>
               <SelectValue placeholder="Filter by location" />
@@ -2947,7 +3055,7 @@ function MyOrders() {
   return (
     <div className="space-y-4">
       <h2 className="text-3xl font-bold text-gray-800">My Orders</h2>
-      <div className="flex space-x-4">
+      <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
         <div className="flex-1">
           <Input
             placeholder="Search by order ID or name..."
@@ -2955,7 +3063,7 @@ function MyOrders() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="w-48">
+        <div className="w-full md:w-48">
           <Select value={statusFilter} onValueChange={(value: Order['status'] | 'all') => setStatusFilter(value)}>
             <SelectTrigger>
               <SelectValue placeholder="Filter by status" />
@@ -3059,7 +3167,7 @@ function StockMovements() {
   return (
     <div className="space-y-4">
       <h2 className="text-3xl font-bold text-gray-800">Stock Movements</h2>
-      <div className="flex space-x-4">
+      <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
         <div className="flex-1">
           <Input
             placeholder="Search by item name..."
@@ -3067,7 +3175,7 @@ function StockMovements() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="w-48">
+        <div className="w-full md:w-48">
           <Select value={typeFilter} onValueChange={(value: 'all' | 'increase' | 'decrease') => setTypeFilter(value)}>
             <SelectTrigger>
               <SelectValue placeholder="Filter by type" />
@@ -3079,7 +3187,7 @@ function StockMovements() {
             </SelectContent>
           </Select>
         </div>
-        <div className="w-48">
+        <div className="w-full md:w-48">
           <Select value={locationFilter} onValueChange={setLocationFilter}>
             <SelectTrigger>
               <SelectValue placeholder="Filter by location" />
@@ -3753,7 +3861,7 @@ function TenantRegistrations() {
   return (
     <div className="space-y-4">
       <h2 className="text-3xl font-bold text-gray-800">Tenant Registrations</h2>
-      <div className="flex space-x-4">
+      <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
         <div className="flex-1">
           <Input
             placeholder="Search by tenant name, owner name, or email..."
@@ -3761,7 +3869,7 @@ function TenantRegistrations() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="w-48">
+        <div className="w-full md:w-48">
           <Select value={statusFilter} onValueChange={(value: TenantRegistration['status'] | 'all') => setStatusFilter(value)}>
             <SelectTrigger>
               <SelectValue placeholder="Filter by status" />
@@ -3836,6 +3944,246 @@ function TenantRegistrations() {
                       }}
                     >
                       <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function UsersAdministration() {
+  const { users, addUser, updateUser, deleteUser } = useAdminStore()
+  const [searchTerm, setSearchTerm] = useState("")
+  const [roleFilter, setRoleFilter] = useState<User['role'] | 'all'>('all')
+  const [editingUser, setEditingUser] = useState<User | null>(null)
+
+  const filteredUsers = users.filter(user =>
+    (user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     user.email.toLowerCase().includes(searchTerm.toLowerCase())) &&
+    (roleFilter === 'all' || user.role === roleFilter)
+  )
+
+  const handleAddUser = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const formData = new FormData(event.currentTarget)
+    const newUser: User = {
+      id: Date.now().toString(),
+      name: formData.get('name') as string,
+      email: formData.get('email') as string,
+      role: formData.get('role') as User['role'],
+    }
+    addUser(newUser)
+    event.currentTarget.reset()
+    toast.success('User added successfully')
+  }
+
+  const handleUpdateUser = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (editingUser) {
+      const formData = new FormData(event.currentTarget)
+      const updatedUser: Partial<User> = {
+        name: formData.get('name') as string,
+        email: formData.get('email') as string,
+        role: formData.get('role') as User['role'],
+      }
+      updateUser(editingUser.id, updatedUser)
+      setEditingUser(null)
+      toast.success('User updated successfully')
+    }
+  }
+
+  return (
+    <div className="space-y-8">
+      <h2 className="text-3xl font-bold text-gray-800">Users Administration</h2>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>Add New User</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleAddUser} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Name</Label>
+              <Input id="name" name="name" required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" name="email" type="email" required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="role">Role</Label>
+              <Select name="role" defaultValue="Client">
+                <SelectTrigger id="role">
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Admin">Admin</SelectItem>
+                  <SelectItem value="Shop manager">Shop manager</SelectItem>
+                  <SelectItem value="Client">Client</SelectItem>
+                  <SelectItem value="Super Admin">Super Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button type="submit">Add User</Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Existing Users</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 mb-4">
+            <div className="flex-1">
+              <Input
+                placeholder="Search by name or email..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <div className="w-full md:w-48">
+              <Select value={roleFilter} onValueChange={(value: User['role'] | 'all') => setRoleFilter(value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filter by role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="Admin">Admin</SelectItem>
+                  <SelectItem value="Shop manager">Shop manager</SelectItem>
+                  <SelectItem value="Client">Client</SelectItem>
+                  <SelectItem value="Super Admin">Super Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredUsers.map((user) => (
+                <TableRow key={user.id}>
+                  <TableCell>{user.name}</TableCell>
+                  <TableCell>{user.email}</TableCell>
+                  <TableCell>{user.role}</TableCell>
+                  <TableCell>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setEditingUser(user)}
+                      className="mr-2"
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => {
+                        deleteUser(user.id)
+                        toast.success('User deleted successfully')
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {editingUser && (
+        <Dialog open={true} onOpenChange={() => setEditingUser(null)}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Edit User</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleUpdateUser} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">Name</Label>
+                <Input id="edit-name" name="name" defaultValue={editingUser.name} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-email">Email</Label>
+                <Input id="edit-email" name="email" type="email" defaultValue={editingUser.email} required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-role">Role</Label>
+                <Select name="role" defaultValue={editingUser.role}>
+                  <SelectTrigger id="edit-role">
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Admin">Admin</SelectItem>
+                    <SelectItem value="Shop manager">Shop manager</SelectItem>
+                    <SelectItem value="Client">Client</SelectItem>
+                    <SelectItem value="Super Admin">Super Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button type="submit">Update User</Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
+  )
+}
+
+function ClientsDashboard() {
+  const { users } = useAdminStore()
+  const [searchTerm, setSearchTerm] = useState("")
+
+  const clients = users.filter(user => user.role === 'Client')
+  const filteredClients = clients.filter(client =>
+    client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    client.email.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  return (
+    <div className="space-y-8">
+      <h2 className="text-3xl font-bold text-gray-800">Clients Dashboard</h2>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>Client List</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-4">
+            <Input
+              placeholder="Search by name or email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredClients.map((client) => (
+                <TableRow key={client.id}>
+                  <TableCell>{client.name}</TableCell>
+                  <TableCell>{client.email}</TableCell>
+                  <TableCell>
+                    <Button variant="outline" size="sm">
+                      View Details
                     </Button>
                   </TableCell>
                 </TableRow>
