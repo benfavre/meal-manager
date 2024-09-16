@@ -1,7 +1,7 @@
-"use client"
+"use client";
 
 import { useState, useEffect, useRef, useMemo } from "react"
-import { create } from 'zustand'
+import { create } from "zustand"
 import { persist } from 'zustand/middleware'
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
@@ -802,8 +802,8 @@ function AdminBar() {
 
   return (
     <div className="bg-gray-800 text-white p-4 flex justify-between items-center">
-      <div className="flex space-x-4">
-        <Select onValueChange={handleRoleChange} value={currentUser?.role || ''}>
+      <div className="flex space-x-4" suppressHydrationWarning>
+        <Select onValueChange={handleRoleChange} value={currentUser?.role || undefined}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Select role" />
           </SelectTrigger>
@@ -813,7 +813,7 @@ function AdminBar() {
             <SelectItem value="Client">Client</SelectItem>
           </SelectContent>
         </Select>
-        <Select onValueChange={handleUserChange} value={currentUser?.id || ''}>
+        <Select onValueChange={handleUserChange} value={currentUser?.id || undefined}>
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Select user" />
           </SelectTrigger>
@@ -1192,9 +1192,13 @@ function MealPlanner() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {shopSettings?.locations.map((location) => (
-                            <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
-                          ))}
+                          {shopSettings?.locations && shopSettings.locations.length > 0 ? (
+                            shopSettings.locations.map((location) => (
+                              <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="default">Default Location</SelectItem>
+                          )}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -1583,12 +1587,12 @@ function ItemManagement() {
         </div>
         <div className="flex-1">
           <Label htmlFor="category-filter">Filter by Category</Label>
-          <Select value={categoryFilter || ''} onValueChange={(value) => setCategoryFilter(value === '' ? null : value)}>
+          <Select value={categoryFilter || 'all'} onValueChange={(value) => setCategoryFilter(value === '' ? null : value)}>
             <SelectTrigger>
               <SelectValue placeholder="All Categories" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Categories</SelectItem>
+              <SelectItem value="all">All Categories</SelectItem>
               {uniqueCategories.map((category) => (
                 <SelectItem key={category} value={category}>{category}</SelectItem>
               ))}
@@ -1597,12 +1601,12 @@ function ItemManagement() {
         </div>
         <div className="flex-1">
           <Label htmlFor="location-filter">Filter by Location</Label>
-          <Select value={locationFilter || ''} onValueChange={(value) => setLocationFilter(value === '' ? null : value)}>
+          <Select value={locationFilter || 'all'} onValueChange={(value) => setLocationFilter(value === '' ? null : value)}>
             <SelectTrigger>
               <SelectValue placeholder="All Locations" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Locations</SelectItem>
+              <SelectItem value={"all"}>All Locations</SelectItem>
               {shopSettings?.locations.map((location) => (
                 <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
               ))}
